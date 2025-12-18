@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 """
 DuckLake 按日期分区数据查询示例
-生成模拟数据并查询过去一个月的销售统计
+生成模拟数据并查询过去一个月的销售统计，包含可视化图表
 """
 
 import duckdb
 from pathlib import Path
 from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')  # 使用非交互式后端，适合保存文件
+
+# 设置中文字体
+plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei', 'STHeiti']
+plt.rcParams['axes.unicode_minus'] = False
 
 PROJECT_DIR = Path(__file__).parent
 METADATA_PATH = PROJECT_DIR / "metadata" / "sales_by_date.ducklake"
 DATA_PATH = PROJECT_DIR / "data_by_date"
+CHART_DIR = PROJECT_DIR / "charts"
 
 
 def setup_ducklake(conn):
@@ -154,6 +162,58 @@ def query_last_month_sales(conn):
         ORDER BY 销售额 DESC
     """).fetchdf()
     print(regions.to_string(index=False))
+    
+    return regions  # 返回区域数据用于绑图
+
+
+def plot_regional_sales(regions_df):
+    """绑制区域销售额柱状图"""
+    CHART_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # 创建图表
+    fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # 提取数据
+    regions = regions_df['区域'].tolist()
+    sales = regions_df['销售额'].tolist()
+    
+    # 定义颜色
+    colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD']
+    
+    # 绑制柱状图
+    bars = ax.bar(regions, sales, color=colors[:len(regions)], edgecolor='white', linewidth=1.2)
+    
+    # 添加数值标签
+    for bar, value in zip(bars, sales):
+        height = bar.get_height()
+        ax.annotate(f'¥{value:,.0f}',
+                   xy=(bar.get_x() + bar.get_width() / 2, height),
+                   xytext=(0, 5),
+                   textcoords="offset points",
+                   ha='center', va='bottom',
+                   fontsize=10, fontweight='bold')
+    
+    # 设置标题和标签
+    ax.set_title('过去 30 天各区域销售额对比', fontsize=16, fontweight='bold', pad=20)
+    ax.set_xlabel('区域', fontsize=12)
+    ax.set_ylabel('销售额 (元)', fontsize=12)
+    
+    # 美化图表
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.set_ylim(0, max(sales) * 1.15)  # 留出标签空间
+    
+    # 添加网格线
+    ax.yaxis.grid(True, linestyle='--', alpha=0.7)
+    ax.set_axisbelow(True)
+    
+    # 保存图表
+    chart_path = CHART_DIR / "regional_sales_bar.png"
+    plt.tight_layout()
+    plt.savefig(chart_path, dpi=150, bbox_inches='tight', facecolor='white')
+    plt.close()
+    
+    print(f"\n📊 柱状图已保存: {chart_path}")
 
 
 def query_custom_date_range(conn, start_date: str, end_date: str):
@@ -182,8 +242,11 @@ def main():
     # 生成模拟数据 (90天, 每天100条)
     generate_sample_data(conn, num_days=90, orders_per_day=100)
     
-    # 查询过去一个月
-    query_last_month_sales(conn)
+    # 查询过去一个月，返回区域数据
+    regions_df = query_last_month_sales(conn)
+    
+    # 绑制区域销售额柱状图
+    plot_regional_sales(regions_df)
     
     # 自定义日期范围查询示例
     from datetime import date
