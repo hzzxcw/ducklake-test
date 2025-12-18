@@ -37,7 +37,7 @@ def setup_duckdb():
             quantity INTEGER,
             unit_price DECIMAL(10,2),
             region VARCHAR,
-            ingest_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ingest_time TIMESTAMP
         )
     """)
     return conn

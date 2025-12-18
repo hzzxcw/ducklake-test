@@ -39,3 +39,4 @@ venv/
 # Jupyter
 .ipynb_checkpoints/
 charts/
+cdc_demo/docker-compose.yml
