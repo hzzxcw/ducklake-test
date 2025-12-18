@@ -102,3 +102,77 @@ flowchart LR
    ```bash
    python3 check_data.py
    ```
+
+## CDC with Debezium (MySQL -> DuckLake)
+
+This demo captures real-time changes (CDC) from MySQL and streams them into DuckLake.
+
+### Architecture
+
+```mermaid
+flowchart LR
+    subgraph "Source (MySQL)"
+    DB[("MySQL\n(inventory.users)")]
+    Binlog[("Binlog")]
+    DB --> Binlog
+    end
+
+    subgraph "CDC Layer (Debezium)"
+    Connect[("Kafka Connect\nDebezium Source")]
+    Redpanda[("Redpanda Broker")]
+    
+    Binlog -->|"Read"| Connect
+    Connect -->|"CDC Events"| Redpanda
+    end
+
+    subgraph "Ingestion Layer"
+    Consumer[cdc_consumer.py]
+    Redpanda -->|"Consume"| Consumer
+    end
+
+    subgraph "Lakehouse Layer"
+    DuckDB[("DuckDB")]
+    Consumer -->|"INSERT/DELETE"| DuckDB
+    
+    DuckDB -->|"Write"| DL_META[("Metadata")]
+    DuckDB -->|"Write"| DL_DATA[("Parquet Data")]
+    end
+```
+
+### Running the CDC Demo
+
+> **Note**: Stop any running Redpanda containers from previous demos first (`docker-compose down`).
+
+1. **Start Infrastructure**:
+   ```bash
+   cd cdc_demo
+   docker-compose up -d
+   ```
+
+2. **Register Connector** (Wait for containers to be ready):
+   ```bash
+   chmod +x register_connector.sh
+   ./register_connector.sh
+   ```
+
+3. **Install Dependencies**:
+   ```bash
+   pip3 install pymysql
+   ```
+
+4. **Grant Permissions** (Fix for demo environment):
+   ```bash
+   docker exec mysql_cdc mysql -u root -pdebezium -e "GRANT INSERT, UPDATE, DELETE ON inventory.* TO 'debezium'@'%'; FLUSH PRIVILEGES;"
+   ```
+
+5. **Start Consumer** (Sync Engine):
+   ```bash
+   # Open a new terminal
+   python3 cdc_consumer.py
+   ```
+
+6. **Start Simulator** (Generate Traffic):
+   ```bash
+   # Open another terminal
+   python3 modify_db.py
+   ```
