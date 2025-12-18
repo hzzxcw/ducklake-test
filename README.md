@@ -41,3 +41,64 @@ ducklake-test/
     ├── 03_time_travel.sql   # Time travel examples
     └── 04_advanced.sql      # Advanced features
 ```
+
+## Real-time Data with Redpanda (Kafka)
+
+This project includes a demo of real-time data ingestion using Redpanda and Micro-batching.
+
+### Architecture
+
+```mermaid
+flowchart LR
+    subgraph "Producer Layer"
+    P[producer.py] -- "JSON Orders" --> RP
+    end
+
+    subgraph "Streaming Layer (Redpanda)"
+    RP[("Redpanda Broker")]
+    T[("Topic: orders")]
+    RP --- T
+    end
+
+    subgraph "Ingestion Layer"
+    C[consumer_sink.py]
+    B[("Memory Buffer")]
+    
+    T -->|"Consume"| C
+    C -->|"Accumulate"| B
+    B -->|"Flush Batch"| DDB
+    end
+
+    subgraph "Lakehouse Layer (DuckLake)"
+    DDB[("DuckDB Engine")]
+    
+    DL_META[("Metadata")]
+    DL_DATA[("Parquet Data")]
+    
+    DDB -->|"Transaction"| DL_META
+    DDB -->|"Write"| DL_DATA
+    end
+```
+
+### Running the Demo
+
+1. **Start Redpanda**:
+   ```bash
+   cd redpanda_demo
+   docker-compose up -d
+   ```
+
+2. **Start Consumer (Ingestion)**:
+   ```bash
+   python3 consumer_sink.py
+   ```
+
+3. **Start Producer (Data Source)**:
+   ```bash
+   python3 producer.py
+   ```
+
+4. **Verify Data**:
+   ```bash
+   python3 check_data.py
+   ```
